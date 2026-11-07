@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>محول النص إلى صوت - فرنسي</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
+        body { font-family: 'Tajawal', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-2xl border border-gray-100">
+        
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-blue-600 mb-2">محول النص إلى صوت 🇫🇷</h1>
+            <p class="text-gray-500">أداة مساعدة لدروس اللغة الفرنسية</p>
+        </div>
+
+        <div class="mb-6">
+            <label for="textToRead" class="block text-gray-700 font-bold mb-2">النص بالفرنسية (Texte en français):</label>
+            <textarea id="textToRead" rows="5" dir="ltr"
+                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-left font-sans text-lg"
+                placeholder="Bonjour les élèves, comment allez-vous aujourd'hui ?"></textarea>
+            <p class="text-xs text-gray-400 mt-2 text-left" dir="ltr">* Pour le téléchargement MP3, utilisez des phrases courtes/moyennes (max ~200 caractères à la fois).</p>
+        </div>
+
+        <div class="mb-6 flex flex-col md:flex-row gap-4">
+            <div class="flex-1">
+                <label for="voiceSelect" class="block text-gray-700 font-bold mb-2">اختر الصوت (للاستماع المباشر):</label>
+                <select id="voiceSelect" dir="ltr"
+                    class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-left bg-gray-50">
+                    <option value="">جاري تحميل الأصوات...</option>
+                </select>
+            </div>
+            
+            <div class="flex-1">
+                <label for="rateSelect" class="block text-gray-700 font-bold mb-2">سرعة القراءة:</label>
+                <div class="flex items-center gap-3 mt-3">
+                    <span class="text-sm text-gray-500">بطيء</span>
+                    <input type="range" id="rateSelect" min="0.5" max="1.5" value="0.9" step="0.1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    <span class="text-sm text-gray-500">سريع</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- أزرار التحكم -->
+        <div class="flex flex-col sm:flex-row gap-3 mt-8">
+            <button id="speakBtn" 
+                class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 shadow-md flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5 10v4a2 2 0 002 2h2.586l3.293 3.293A1 1 0 0014 18.5V5.5a1 1 0 00-1.707-.707L7.586 8H7a2 2 0 00-2 2z" />
+                </svg>
+                استماع
+            </button>
+
+            <!-- زر التحميل الجديد -->
+            <button id="downloadBtn" 
+                class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 shadow-md flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span id="downloadText">تحميل MP3</span>
+            </button>
+
+            <button id="stopBtn" 
+                class="bg-red-100 hover:bg-red-200 text-red-600 font-bold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center gap-2">
+                إيقاف
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- 1. أكواد الاستماع المباشر (نفس الكود السابق) ---
+        const synth = window.speechSynthesis;
+        const textToRead = document.getElementById('textToRead');
+        const voiceSelect = document.getElementById('voiceSelect');
+        const rateSelect = document.getElementById('rateSelect');
+        const speakBtn = document.getElementById('speakBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        let voices = [];
+
+        function populateVoiceList() {
+            voices = synth.getVoices();
+            voiceSelect.innerHTML = '';
+            const frenchVoices = voices.filter(voice => voice.lang.startsWith('fr'));
+            
+            if (frenchVoices.length === 0) {
+                const option = document.createElement('option');
+                option.textContent = 'لا يوجد أصوات فرنسية مثبتة';
+                voiceSelect.appendChild(option);
+                return;
+            }
+
+            frenchVoices.forEach((voice) => {
+                const option = document.createElement('option');
+                let genderHint = '';
+                let voiceName = voice.name.toLowerCase();
+                if(voiceName.includes('paul') || voiceName.includes('thomas') || voiceName.includes('david')) {
+                    genderHint = ' (ذكر)';
+                } else if(voiceName.includes('hortense') || voiceName.includes('julie') || voiceName.includes('audrey')) {
+                    genderHint = ' (أنثى)';
+                }
+                option.textContent = `${voice.name} ${genderHint}`;
+                option.setAttribute('data-name', voice.name);
+                voiceSelect.appendChild(option);
+            });
+        }
+
+        populateVoiceList();
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = populateVoiceList;
+        }
+
+        speakBtn.addEventListener('click', () => {
+            if (synth.speaking) return;
+            if (textToRead.value !== '') {
+                const utterThis = new SpeechSynthesisUtterance(textToRead.value);
+                const selectedOption = voiceSelect.options[voiceSelect.selectedIndex]?.getAttribute('data-name');
+                if(selectedOption) {
+                    for (let i = 0; i < voices.length; i++) {
+                        if (voices[i].name === selectedOption) {
+                            utterThis.voice = voices[i];
+                            break;
+                        }
+                    }
+                }
+                utterThis.rate = rateSelect.value;
+                utterThis.lang = 'fr-FR';
+                synth.speak(utterThis);
+            } else {
+                alert("الرجاء كتابة نص أولاً!");
+            }
+        });
+        
+        stopBtn.addEventListener('click', () => {
+            if(synth.speaking) synth.cancel();
+        });
+
+
+        // --- 2. أكواد زر تحميل الصوت MP3 (الخاصية الجديدة) ---
+        const downloadBtn = document.getElementById('downloadBtn');
+        const downloadText = document.getElementById('downloadText');
+
+        downloadBtn.addEventListener('click', async () => {
+            const text = textToRead.value.trim();
+            if (!text) {
+                alert("الرجاء كتابة نص أولاً لتحميله!");
+                return;
+            }
+
+            // إظهار حالة التحميل للوالد
+            const originalHTML = downloadBtn.innerHTML;
+            downloadText.textContent = "جاري التحميل... ⏳";
+            downloadBtn.disabled = true;
+            downloadBtn.classList.add('opacity-75', 'cursor-not-allowed');
+
+            try {
+                // نستخدم خدمة جوجل المجانية لتوليد ملف الصوت
+                const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=fr&client=tw-ob&q=${encodeURIComponent(text)}`;
+                
+                // نستخدم خدمة وسيطة (Proxy) لتخطي حماية المتصفحات (CORS) والسماح بالتحميل المباشر
+                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(ttsUrl)}`;
+                
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error("Network response was not ok");
+                
+                const blob = await response.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                
+                // إنشاء رابط خفي والضغط عليه برمجياً لتحميل الملف
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = blobUrl;
+                
+                // تسمية الملف الصوتي بشكل أنيق
+                const fileName = `Audio_Francais_${Math.floor(Math.random() * 1000)}.mp3`;
+                a.download = fileName;
+                
+                document.body.appendChild(a);
+                a.click();
+                
+                // تنظيف المتصفح
+                window.URL.revokeObjectURL(blobUrl);
+                document.body.removeChild(a);
+
+            } catch (error) {
+                console.error("خطأ في التحميل:", error);
+                // خطة بديلة: إذا فشل التحميل الصامت، نفتح الصوت في نافذة جديدة ليقوم بحفظه يدوياً
+                alert("حدث خطأ بسيط. سيتم فتح الصوت في نافذة جديدة، يمكنك الضغط على الثلاث نقاط هناك واختيار 'تنزيل' (Download).");
+                window.open(`https://translate.google.com/translate_tts?ie=UTF-8&tl=fr&client=tw-ob&q=${encodeURIComponent(text)}`, '_blank');
+            } finally {
+                // إعادة الزر لشكله الأصلي
+                downloadBtn.innerHTML = originalHTML;
+                downloadBtn.disabled = false;
+                downloadBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+            }
+        });
+    </script>
+</body>
+</html>
